@@ -1,6 +1,6 @@
 # SDL3 GUI
 
-Attempting to create a GUI with SDL3
+Attempting to create a GUI header file with SDL3
 
 ![Screenshot of my app](images/screenshot.png)
 
