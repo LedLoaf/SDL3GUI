@@ -1,193 +1,107 @@
-#include <SDL3/SDL.h>
-#include <SDL3/SDL_main.h>
+// main.cpp — Demo of the SDL3 GUI system
+#include "sdl3_gui.h"
+#include <string>
 
-#include "imgui.h"
-#include "imgui_impl_sdl3.h"
-#include "imgui_impl_sdlrenderer3.h"
-#include <iostream>
+int main() {
+    GUIApp app;
+    if (!app.init("SDL3 GUI Demo", 800, 600)) return 1;
 
-SDL_Texture* SDL3_IMAGE_TEST(SDL_Renderer* renderer, int rOffset, int gOffset, int bVal, float scale);
+    // ─── Menu Bar (background only) ──────────────────────────────────────────
+    Toolbar* menuBar = app.root->add<Toolbar>(0, 0, 800, 30);
 
-// Global variables for ImGui manipulation
-int   g_RedOffset   = 0;
-int   g_GreenOffset = 0;
-int   g_BlueValue   = 128;
-float g_ScaleFactor = 1.0f;
+    // ─── Toolbar ─────────────────────────────────────────────────────────────
+    Toolbar* toolbar = app.root->add<Toolbar>(0, 30, 800, 36);
+    auto* toolNew = toolbar->addTool<Button>("New", 4, 32, 60, 32, []() { SDL_Log("Tool: New"); });
+    auto* toolOpen = toolbar->addTool<Button>("Open", 70, 32, 60, 32, []() { SDL_Log("Tool: Open"); });
+    auto* toolSave = toolbar->addTool<Button>("Save", 136, 32, 60, 32, []() { SDL_Log("Tool: Save"); });
+    auto* toolRun = toolbar->addTool<Button>("Run", 202, 32, 60, 32, []() { SDL_Log("Tool: Run"); });
+    toolNew->setTooltip("Create a new document");
+    toolOpen->setTooltip("Open an existing file");
+    toolSave->setTooltip("Save current changes");
+    toolRun->setTooltip("Run the application");
 
-int main(int argc, char* argv[])
-{
-     bool running = true;
+    // ─── Tab Panel ───────────────────────────────────────────────────────────
+    TabPanel* tabs = app.root->add<TabPanel>(4, 70, 520, 400);
 
-    if (!SDL_Init(SDL_INIT_VIDEO)) 
-    {
-      SDL_Log("Error: SDL_Init(): %", SDL_GetError());
-      running = false;
+    // Tab 1: General
+    Container* tab1 = tabs->addTab("General");
+    tab1->add<Label>("Application Settings:", 10, 10, 200, 24);
+    tab1->add<Label>("Name:", 10, 40, 80, 24);
+    auto* nameBox = tab1->add<TextBox>(100, 40, 200, 26);
+    nameBox->setTooltip("Enter the application name");
+    tab1->add<Label>("Version:", 10, 74, 80, 24);
+    auto* versionBox = tab1->add<TextBox>(100, 74, 200, 26);
+    versionBox->setTooltip("Enter the version number");
+    auto* applyBtn = tab1->add<Button>("Apply", 100, 110, 80, 28, []() { SDL_Log("Settings applied"); });
+    applyBtn->setTooltip("Save your changes");
+
+    // Tab 2: Advanced
+    Container* tab2 = tabs->addTab("Advanced");
+    tab2->add<Label>("Debug Level:", 10, 10, 120, 24);
+    tab2->add<TextBox>(140, 10, 150, 26);
+    tab2->add<Label>("Log Path:", 10, 44, 100, 24);
+    tab2->add<TextBox>(120, 44, 220, 26);
+
+    // Tab 3: Network
+    Container* tab3 = tabs->addTab("Network");
+    tab3->add<Label>("Server:", 10, 10, 80, 24);
+    tab3->add<TextBox>(100, 10, 200, 26);
+    tab3->add<Label>("Port:", 10, 44, 60, 24);
+    tab3->add<TextBox>(80, 44, 80, 26);
+
+    // ─── ScrollBox with selection + add ──────────────────────────────────────
+    ScrollBox* scroll = app.root->add<ScrollBox>(530, 70, 266, 340);
+    for (int i = 0; i < 20; ++i) {
+        scroll->addItem<Label>("Item " + std::to_string(i + 1), 4, i * 30, 250, 28);
     }
+    scroll->update();
 
-    SDL_Window* window = SDL_CreateWindow("SDL3 Template", 1280, 720, SDL_WINDOW_RESIZABLE | SDL_WINDOW_HIGH_PIXEL_DENSITY);
-    if (!window) 
-    {
-       SDL_Log("Error: SDL_CreateWindow(): %s", SDL_GetError());
-       running = false;
-    }
+    Label* selectedLabel = app.root->add<Label>("(none selected)", 530, 414, 266, 20);
+    scroll->onSelect = [selectedLabel](const std::string& txt) {
+        selectedLabel->text = "Selected: " + txt;
+        };
 
-    SDL_Renderer* renderer = SDL_CreateRenderer(window, nullptr);
-    if (!renderer) 
-    {
-       SDL_Log("Error: SDL_CreateRenderer(): %s", SDL_GetError());
-       running = false;
-    }
-
-    SDL_SetRenderVSync(renderer, 1);
-    SDL_SetWindowPosition(window, SDL_WINDOWPOS_CENTERED, SDL_WINDOWPOS_CENTERED);
-
-    float main_scale = SDL_GetDisplayContentScale(SDL_GetPrimaryDisplay());
-
-    // Setup Dear ImGui context
-    IMGUI_CHECKVERSION();
-    ImGui::CreateContext();
-    ImGuiIO& io = ImGui::GetIO();
-    (void)io;
-    io.ConfigFlags |= ImGuiConfigFlags_NavEnableKeyboard; // Enable Keyboard Controls
-    io.ConfigFlags |= ImGuiConfigFlags_NavEnableGamepad;  // Enable Gamepad Controls
-    // Setup scaling for high DPI
-    ImGuiStyle& style = ImGui::GetStyle();
-    style.ScaleAllSizes(main_scale);
-    style.FontScaleDpi = main_scale;
-
-
-    // Setup Platform/Renderer backends
-    ImGui_ImplSDL3_InitForSDLRenderer(window, renderer);
-    ImGui_ImplSDLRenderer3_Init(renderer);
-
-    SDL_Event event;
-
-    while (running) {
-        while (SDL_PollEvent(&event)) 
-        {
-             ImGui_ImplSDL3_ProcessEvent(&event);
-
-            if (event.type == SDL_EVENT_WINDOW_CLOSE_REQUESTED && event.window.windowID == SDL_GetWindowID(window))
-            {
-               running = false;
-            }
-            if (event.type == SDL_EVENT_KEY_DOWN) 
-            {
-               if (event.key.key == SDLK_ESCAPE && event.key.windowID == SDL_GetWindowID(window))
-               {
-                  running = false;
-               }
-            }
+    TextBox* newEntry = app.root->add<TextBox>(530, 440, 140, 26);
+    newEntry->setTooltip("Type a name, then click Add");
+    auto* addBtn = app.root->add<Button>("Add", 674, 440, 50, 26, [scroll, newEntry]() {
+        if (!newEntry->text.empty()) {
+            scroll->addNewItem(newEntry->text);
+            newEntry->text.clear();
         }
+        });
+    addBtn->setTooltip("Add a new item to the list");
 
-         // Start the Dear ImGui frame
-        ImGui_ImplSDLRenderer3_NewFrame();
-        ImGui_ImplSDL3_NewFrame();
-        ImGui::NewFrame();
+    // ─── Status Bar ──────────────────────────────────────────────────────────
+    app.root->add<Label>("Ready", 4, 476, 400, 20);
+    app.root->add<Label>("SDL3 GUI Demo", 500, 476, 296, 20);
 
-          // --- GUI Content ---
-        ImGui::Begin("Hello Window");
+    // ─── Dialog ──────────────────────────────────────────────────────────────
+    Dialog* aboutDlg = app.createDialog("About", 300, 200, true);
+    aboutDlg->add<Label>("SDL3 GUI System", 20, 40, 260, 30);
+    aboutDlg->add<Label>("Version 1.0", 20, 80, 200, 24);
+    aboutDlg->add<Button>("OK", 110, 140, 80, 30, [aboutDlg]() { aboutDlg->closeDialog(); });
 
-        // Button Logic: Returns true only on the click frame
-        if (ImGui::Button("Say Hello")) {
-           SDL_Log("Hello! Button was clicked.");
-        }
-        ImGui::End();
+    auto* aboutBtn = app.root->add<Button>("About", 730, 440, 66, 26, [aboutDlg, &app]() {
+        aboutDlg->openDialog(app.window);
+        });
+    aboutBtn->setTooltip("About this application");
 
-        // --- ImGui Controls ---
-        ImGui::Begin("Texture Controls");
-        ImGui::SliderInt("Red Offset", &g_RedOffset, -100, 100);
-        ImGui::SliderInt("Green Offset", &g_GreenOffset, -100, 100);
-        ImGui::SliderInt("Blue Value", &g_BlueValue, 0, 255);
-        ImGui::SliderFloat("Scale Factor", &g_ScaleFactor, 0.1f, 2.0f);
+    // ─── Menus (added LAST so they're topmost in z-order) ────────────────────
+    Menu* fileMenu = app.root->add<Menu>("File", 4, 2, 50, 26);
+    fileMenu->addItem("New", []() { SDL_Log("New"); });
+    fileMenu->addItem("Open", []() { SDL_Log("Open"); });
+    fileMenu->addItem("Save", []() { SDL_Log("Save"); });
+    fileMenu->addItem("Exit", [&app]() { app.quit(); });
 
-        ImGui::End();
-        // ----------------------
+    Menu* editMenu = app.root->add<Menu>("Edit", 60, 2, 50, 26);
+    editMenu->addItem("Undo", []() { SDL_Log("Undo"); });
+    editMenu->addItem("Redo", []() { SDL_Log("Redo"); });
+    editMenu->addItem("Cut", []() { SDL_Log("Cut"); });
 
-        // Cleanup previous frame's texture (important to avoid leaks when regenerating every frame)
-        static SDL_Texture* currentTexture = nullptr;
-        if (currentTexture) {
-           SDL_DestroyTexture(currentTexture);
-        }
+    Menu* helpMenu = app.root->add<Menu>("Help", 116, 2, 50, 26);
+    helpMenu->addItem("About", [aboutDlg, &app]() { aboutDlg->openDialog(app.window); });
 
-        // Generate new texture with current ImGui values
-        currentTexture = SDL3_IMAGE_TEST(renderer, g_RedOffset, g_GreenOffset, g_BlueValue, g_ScaleFactor);
-
-        // ---- RENDERING ----
-        // Example GUI
-        ImGui::ShowDemoWindow();
-        ImGui::Render();
-
-        SDL_SetRenderScale(renderer, io.DisplayFramebufferScale.x, io.DisplayFramebufferScale.y);
-        SDL_SetRenderDrawColorFloat(renderer, 0.45f, 0.55f, 0.60f, 1.00f); // SDL3 uses float colors
-        SDL_RenderClear(renderer);
-        
-        // Draw a red rectangle
-        SDL_SetRenderDrawColor(renderer, 255, 0, 0, 255);
-        SDL_FRect rect = { 200.0f, 150.0f, 200.0f, 150.0f };
-        SDL_RenderFillRect(renderer, &rect);
-
-        // Draw the procedurally generated texture scaled to fit window
-        SDL_FRect destRect = { 0, 0, 1280, 720 };
-        SDL_RenderTexture(renderer, currentTexture, NULL, &destRect);
-
-        ImGui_ImplSDLRenderer3_RenderDrawData(ImGui::GetDrawData(), renderer);
-        
-        SDL_RenderPresent(renderer);
-    }
-
-     // Cleanup
-    ImGui_ImplSDLRenderer3_Shutdown();
-    ImGui_ImplSDL3_Shutdown();
-    ImGui::DestroyContext();
-
-    SDL_DestroyRenderer(renderer);
-    SDL_DestroyWindow(window);
-    SDL_Quit();
+    // ─── Run ─────────────────────────────────────────────────────────────────
+    app.run();
     return 0;
-}   
-
-SDL_Texture* SDL3_IMAGE_TEST(SDL_Renderer* renderer, int rOffset, int gOffset, int bVal, float scale)
-{
-   int width  = 1280;
-   int height = 720;
-   int pitch  = width * 4;
-
-   // Allocate pixel data
-   Uint32* pixels = (Uint32*)SDL_malloc(pitch * height);
-   if (!pixels)
-      return nullptr;
-
-   // Generate pixel data using ImGui-controlled values
-   for (int y = 0; y < height; y++) {
-      for (int x = 0; x < width; x++) {
-         int index = y * (pitch / 4) + x;
-
-         // Apply ImGui controls to the formula
-         Uint8 r = (Uint8)SDL_clamp((x * scale) + rOffset, 0, 255);
-         Uint8 g = (Uint8)SDL_clamp((y * scale) + gOffset, 0, 255);
-         Uint8 b = (Uint8)bVal;
-         Uint8 a = 255;
-
-         // Pack pixels (SDL_PIXELFORMAT_RGBA8888)
-         pixels[index] = (a << 24) | (b << 16) | (g << 8) | r;
-      }
-   }
-
-   // Create Surface
-   SDL_Surface* surface = SDL_CreateSurfaceFrom(width, height, SDL_PIXELFORMAT_RGBA8888, pixels, pitch);
-   if (!surface) 
-   {
-      SDL_free(pixels);
-      return nullptr;
-   }
-
-   // Create/Update Texture
-   // Hint: SDL_TEXTUREACCESS_STREAMING allows updates, but recreating is simpler for this demo
-   SDL_Texture* tex = SDL_CreateTextureFromSurface(renderer, surface);
-
-   SDL_DestroySurface(surface);
-   SDL_free(pixels); // CPU memory freed; GPU holds the copy
-
-   return tex;
 }

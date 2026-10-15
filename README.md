@@ -1,6 +1,8 @@
-# SDL3Template
+# SDL3 GUI
 
-A C++23 project template using SDL3 with Dear ImGui.
+Attempting to create a GUI with SDL3
+
+![Screenshot of my app](images/screenshot.png)
 
 ## Prerequisites
 
